@@ -8,9 +8,16 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- React & ReactDOM (загрузка через CDN) -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <!-- Import Map для загрузки React как модулей -->
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client"
+      }
+    }
+  </script>
   
   <!-- Babel (компиляция JSX прямо в браузере) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -47,9 +54,10 @@
   <!-- Контейнер для React-приложения -->
   <div id="root"></div>
 
-  <!-- Логика приложения -->
+  <!-- Логика приложения (теперь работает как полноценный модуль) -->
   <script type="text/babel" data-type="module">
-    const { useState, useMemo } = React;
+    import React, { useState, useMemo } from 'react';
+    import { createRoot } from 'react-dom/client';
 
     // --- Встроенные SVG Иконки ---
     const PrinterIcon = () => (
@@ -286,7 +294,7 @@
     }
 
     // Инициализация React 18
-    const root = ReactDOM.createRoot(document.getElementById('root'));
+    const root = createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
 </body>
