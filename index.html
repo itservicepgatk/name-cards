@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Генератор Табличек</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & ReactDOM (загрузка через CDN) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  
+  <!-- Babel (компиляция JSX прямо в браузере) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-page {
+        box-shadow: none !important;
+        margin: 0 !important;
+        page-break-after: always;
+      }
+    }
+    
+    .card-font {
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 700;
+      color: #323232;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans print:bg-white text-gray-800">
+  
+  <!-- Контейнер для React-приложения -->
+  <div id="root"></div>
+
+  <!-- Логика приложения -->
+  <script type="text/babel" data-type="module">
+    const { useState, useMemo } = React;
+
+    // --- Встроенные SVG Иконки ---
+    const PrinterIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+    );
+    const EditIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+    );
+    const InfoIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+    );
+    const SettingsIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    );
+
+    // --- Локальное хранилище ---
+    function useLocalStorage(key, initialValue) {
+      const [storedValue, setStoredValue] = useState(() => {
+        try {
+          const item = window.localStorage.getItem(key);
+          return item ? JSON.parse(item) : initialValue;
+        } catch (error) {
+          return initialValue;
+        }
+      });
+
+      const setValue = (value) => {
+        try {
+          const valueToStore = value instanceof Function ? value(storedValue) : value;
+          setStoredValue(valueToStore);
+          window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        } catch (error) {
+          console.log(error);
+        }
+      };
+
+      return [storedValue, setValue];
+    }
+
+    const defaultData = `КУЛЕШ Игорь Леонидович, Заместитель директора по производственному обучению`;
+
+    // --- Основное приложение ---
+    function App() {
+      const [inputText, setInputText] = useLocalStorage('cards-input-text', defaultData);
+      const [fontSizeSurname, setFontSizeSurname] = useLocalStorage('cards-font-surname', 54);
+      const [fontSizeName, setFontSizeName] = useLocalStorage('cards-font-name', 38);
+      const [fontSizeTitle, setFontSizeTitle] = useLocalStorage('cards-font-title', 24);
+
+      // Парсинг текста
+      const cards = useMemo(() => {
+        return inputText
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
+          .map((line) => {
+            const parts = line.split(/\s+/).filter(Boolean);
+            if (parts.length < 3) return null;
+
+            const surname = parts[0].replace(/,/g, '').toUpperCase();
+            const namePatr = `${parts[1].replace(/,/g, '')} ${parts[2].replace(/,/g, '')}`.toUpperCase();
+            const title = parts.slice(3).join(' ').replace(/\.$/, '').toUpperCase();
+
+            return { surname, namePatr, title };
+          })
+          .filter(Boolean);
+      }, [inputText]);
+
+      // Разбиваем карточки по 2 на страницу
+      const pages = useMemo(() => {
+        const result = [];
+        for (let i = 0; i < cards.length; i += 2) {
+          result.push(cards.slice(i, i + 2));
+        }
+        return result;
+      }, [cards]);
+
+      const handlePrint = () => {
+        window.print();
+      };
+
+      return (
+        <React.Fragment>
+          {/* Верхняя панель управления */}
+          <div className="no-print bg-white shadow-md mb-8">
+            <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <EditIcon />
+                  Генератор настольных табличек
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  Формат А4, по 2 таблички (21x15 см) на лист
+                </p>
+              </div>
+              <button
+                onClick={handlePrint}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition-colors"
+              >
+                <PrinterIcon />
+                Распечатать / Сохранить в PDF
+              </button>
+            </div>
+          </div>
+
+          <div className="max-w-7xl mx-auto px-4 pb-12 flex flex-col lg:flex-row gap-8">
+            
+            {/* Левая колонка: Ввод текста */}
+            <div className="no-print w-full lg:w-1/3 flex flex-col gap-4">
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <div className="flex items-start gap-3 bg-blue-50 text-blue-800 p-3 rounded-lg mb-4 text-sm">
+                  <InfoIcon />
+                  <p>
+                    <strong>Формат ввода:</strong> Фамилия Имя Отчество, Должность (можно скопировать из Word). Каждая персона с новой строки.
+                  </p>
+                </div>
+                
+                <label className="block text-sm font-semibold mb-2" htmlFor="data-input">
+                  Список сотрудников ({cards.length} шт.):
+                </label>
+                <textarea
+                  id="data-input"
+                  className="w-full h-[500px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none font-mono text-sm"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Иванов Иван Иванович, Директор..."
+                />
+              </div>
+
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                  <SettingsIcon />
+                  Настройки шрифта (сохраняются)
+                </h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Фамилия</span>
+                      <span className="font-mono">{fontSizeSurname}px</span>
+                    </label>
+                    <input 
+                      type="range" min="30" max="90" 
+                      value={fontSizeSurname} 
+                      onChange={(e) => setFontSizeSurname(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Имя и Отчество</span>
+                      <span className="font-mono">{fontSizeName}px</span>
+                    </label>
+                    <input 
+                      type="range" min="20" max="70" 
+                      value={fontSizeName} 
+                      onChange={(e) => setFontSizeName(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Должность</span>
+                      <span className="font-mono">{fontSizeTitle}px</span>
+                    </label>
+                    <input 
+                      type="range" min="15" max="50" 
+                      value={fontSizeTitle} 
+                      onChange={(e) => setFontSizeTitle(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl shadow-sm text-sm text-yellow-800">
+                <strong>Перед печатью:</strong> В окне печати браузера обязательно установите <b>«Поля» (Margins)</b> в значение <b>«Нет» (None)</b> и масштаб 100%, чтобы размеры совпали идеально.
+              </div>
+            </div>
+
+            {/* Правая колонка: Предпросмотр */}
+            <div className="w-full lg:w-2/3 flex flex-col items-center">
+              {pages.map((pageCards, pageIndex) => (
+                <div
+                  key={pageIndex}
+                  className="print-page bg-white shadow-lg mb-8 relative"
+                  style={{ width: '210mm', height: '297mm', overflow: 'hidden' }}
+                >
+                  {pageCards.map((card, cardIndex) => (
+                    <div
+                      key={cardIndex}
+                      className="flex flex-col justify-center items-center text-center relative"
+                      style={{
+                        width: '210mm',
+                        height: '148.5mm',
+                        padding: '20mm',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div className="w-full max-w-[170mm]">
+                        <div className="card-font tracking-wide mb-2 leading-tight" style={{ fontSize: `${fontSizeSurname}px` }}>
+                          {card.surname}
+                        </div>
+                        
+                        <div className="card-font tracking-wide mb-8" style={{ fontSize: `${fontSizeName}px` }}>
+                          {card.namePatr}
+                        </div>
+                        
+                        <div className="w-full h-[4px] bg-[#323232] mx-auto my-8"></div>
+                        
+                        <div className="card-font leading-snug mx-auto" style={{ fontSize: `${fontSizeTitle}px`, maxWidth: '90%' }}>
+                          {card.title}
+                        </div>
+                      </div>
+
+                      {cardIndex === 0 && (
+                        <div className="absolute bottom-0 left-0 w-full border-b-[2px] border-dashed border-gray-300 print:border-gray-200" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
+              
+              {cards.length === 0 && (
+                <div className="no-print mt-20 text-gray-400 text-center">
+                  Введите данные слева, чтобы увидеть предпросмотр
+                </div>
+              )}
+            </div>
+          </div>
+        </React.Fragment>
+      );
+    }
+
+    // Инициализация React 18
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
